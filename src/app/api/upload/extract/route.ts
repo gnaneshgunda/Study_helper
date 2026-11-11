@@ -92,18 +92,23 @@ export async function POST(request: NextRequest) {
 /**
  * Extract plain text from each page of a PDF using pdfjs-dist.
  * Falls back to empty string on pages that fail (image-only slides).
+ *
+ * Node.js pattern: set workerSrc to the absolute file:// URL of the
+ * worker bundle so pdfjs can spawn it as a worker_threads Worker.
  */
 async function extractPdfText(buffer: ArrayBuffer): Promise<string[]> {
-  // Dynamic import keeps pdfjs-dist server-side only
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const path = await import("path");
 
-  // In Node there is no worker thread — disable it entirely
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+  // Resolve the worker path relative to node_modules at runtime
+  const workerPath = path.resolve(
+    process.cwd(),
+    "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
+  );
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
 
   const pdf = await pdfjsLib.getDocument({
     data: new Uint8Array(buffer),
-    // @ts-expect-error — legacy build supports this flag; types don't expose it
-    disableWorker: true,
   }).promise;
   const results: string[] = [];
 
