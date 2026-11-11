@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // allow time for large PDFs
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,11 +23,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
-    // Verify the user owns this lecture (via service client for RLS bypass on reads)
-    const serviceClient = await createServiceClient();
-    const { data: lecture } = await serviceClient
+    const svc = await createServiceClient();
+
+    // Verify lecture exists
+    const { data: lecture } = await svc
       .from("lectures")
-      .select("id, course_id, courses(user_id)")
+      .select("id")
       .eq("id", lectureId)
       .single();
 
@@ -35,8 +36,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Lecture not found" }, { status: 404 });
     }
 
-    // Download the PDF bytes from Storage
-    const { data: fileData, error: dlErr } = await serviceClient.storage
+    // Download PDF bytes from Storage
+    const { data: fileData, error: dlErr } = await svc.storage
       .from("slides")
       .download(storagePath);
 
@@ -44,12 +45,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not fetch file from storage" }, { status: 500 });
     }
 
-    // Extract text with pdfjs-dist
-    const arrayBuffer = await fileData.arrayBuffer();
-    const pages = await extractPdfText(arrayBuffer);
+    // Extract text — pdf-parse runs pure Node, no worker needed
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    const pages = await extractPdfText(buffer);
 
     // Insert document row
-    const { data: doc, error: docErr } = await serviceClient
+    const { data: doc, error: docErr } = await svc
       .from("documents")
       .insert({
         lecture_id: lectureId,
@@ -61,22 +62,22 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (docErr || !doc) {
-      return NextResponse.json({ error: docErr?.message ?? "DB insert failed" }, { status: 500 });
+      return NextResponse.json(
+        { error: docErr?.message ?? "DB insert failed" },
+        { status: 500 }
+      );
     }
 
-    // Insert page rows (batch)
+    // Insert page rows
     if (pages.length > 0) {
-      const pageRows = pages.map((text, idx) => ({
-        document_id: doc.id,
-        page_number: idx + 1,
-        text,
-      }));
-
-      const { error: pageErr } = await serviceClient.from("pages").insert(pageRows);
-      if (pageErr) {
-        console.error("Page insert error:", pageErr.message);
-        // Non-fatal — document is still usable
-      }
+      const { error: pageErr } = await svc.from("pages").insert(
+        pages.map((text, idx) => ({
+          document_id: doc.id,
+          page_number: idx + 1,
+          text,
+        }))
+      );
+      if (pageErr) console.error("Page insert error:", pageErr.message);
     }
 
     return NextResponse.json(doc);
@@ -90,42 +91,34 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Extract plain text from each page of a PDF using pdfjs-dist.
- * Falls back to empty string on pages that fail (image-only slides).
- *
- * Node.js pattern: set workerSrc to the absolute file:// URL of the
- * worker bundle so pdfjs can spawn it as a worker_threads Worker.
+ * Extract per-page text using pdf-parse.
+ * pdf-parse is a pure-Node library — no browser worker, no canvas, no DOM.
  */
-async function extractPdfText(buffer: ArrayBuffer): Promise<string[]> {
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const path = await import("path");
+async function extractPdfText(buffer: Buffer): Promise<string[]> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require("pdf-parse") as (
+    buf: Buffer,
+    opts?: Record<string, unknown>
+  ) => Promise<{ numpages: number; text: string }>;
 
-  // Resolve the worker path relative to node_modules at runtime
-  const workerPath = path.resolve(
-    process.cwd(),
-    "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"
-  );
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `file://${workerPath}`;
+  const pageTexts: string[] = [];
 
-  const pdf = await pdfjsLib.getDocument({
-    data: new Uint8Array(buffer),
-  }).promise;
-  const results: string[] = [];
+  // pagerender is called once per page; we collect the text in order
+  await pdfParse(buffer, {
+    pagerender(pageData: {
+      getTextContent: () => Promise<{ items: Array<{ str?: string }> }>;
+    }) {
+      return pageData.getTextContent().then((content) => {
+        const text = content.items
+          .map((item) => item.str ?? "")
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        pageTexts.push(text);
+        return text;
+      });
+    },
+  });
 
-  for (let i = 1; i <= pdf.numPages; i++) {
-    try {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const text = content.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-      results.push(text);
-    } catch {
-      results.push(""); // image-only page — vision fallback happens at chat time
-    }
-  }
-
-  return results;
+  return pageTexts;
 }
