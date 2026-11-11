@@ -1,11 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ["pdfjs-dist"],
+    serverComponentsExternalPackages: ["pdfjs-dist", "pdf-parse"],
+  },
+  // Serve .mjs files from /public with the correct MIME type
+  async headers() {
+    return [
+      {
+        source: "/:file*.mjs",
+        headers: [
+          { key: "Content-Type", value: "text/javascript" },
+        ],
+      },
+    ];
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // react-pdf / pdfjs-dist: suppress canvas warning in browser bundle
       config.resolve.alias.canvas = false;
     }
     return config;

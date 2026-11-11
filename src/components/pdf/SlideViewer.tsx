@@ -12,7 +12,8 @@ import {
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// Use the worker file copied to /public — avoids CDN dependency and version mismatches
+// Worker must match react-pdf's own bundled pdfjs version (4.4.168).
+// The file is copied from react-pdf/node_modules/pdfjs-dist into /public.
 pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 interface Props {
