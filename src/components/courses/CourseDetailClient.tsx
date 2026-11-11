@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { type Course, type Lecture, type Document } from "@/types/database";
-import { Plus, FileText, Loader2, X, ChevronLeft, Upload } from "lucide-react";
+import { Plus, FileText, Loader2, X, ChevronLeft, Upload, Trash2, StickyNote } from "lucide-react";
 import { AppShell } from "@/components/ui/AppShell";
 import { UploadModal } from "@/components/courses/UploadModal";
 
@@ -23,20 +23,18 @@ export function CourseDetailClient({ course, initialLectures }: Props) {
   const [lectureTitle, setLectureTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
 
   async function createLecture(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     const nextPos = lectures.length > 0 ? Math.max(...lectures.map((l) => l.position)) + 1 : 0;
-
     const { data, error: err } = await supabase
       .from("lectures")
       .insert({ course_id: course.id, title: lectureTitle, position: nextPos })
       .select()
       .single();
-
     if (err) {
       setError(err.message);
     } else if (data) {
@@ -54,6 +52,25 @@ export function CourseDetailClient({ course, initialLectures }: Props) {
     setUploadTarget(null);
   }
 
+  async function deleteDocument(doc: Pick<Document, "id" | "title" | "page_count">, lectureId: string) {
+    if (!confirm(`Delete "${doc.title}"? This removes the PDF and all extracted text. Notes and doubts linked to it will also be deleted.`)) return;
+    setDeletingDocId(doc.id);
+    try {
+      const { data: fullDoc } = await supabase.from("documents").select("storage_path").eq("id", doc.id).single();
+      if (fullDoc?.storage_path) {
+        await supabase.storage.from("slides").remove([fullDoc.storage_path]);
+      }
+      await supabase.from("documents").delete().eq("id", doc.id);
+      setLectures(lectures.map((l) =>
+        l.id === lectureId ? { ...l, documents: l.documents.filter((d) => d.id !== doc.id) } : l
+      ));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingDocId(null);
+    }
+  }
+
   return (
     <AppShell>
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -64,23 +81,23 @@ export function CourseDetailClient({ course, initialLectures }: Props) {
           </Link>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div
-                className="h-10 w-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: course.color }}
-                aria-hidden="true"
-              />
+              <div className="h-10 w-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: course.color }} aria-hidden="true" />
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">{course.name}</h1>
                 {(course.code || course.semester) && (
-                  <p className="text-sm text-slate-400 mt-0.5">
-                    {[course.code, course.semester].filter(Boolean).join(" · ")}
-                  </p>
+                  <p className="text-sm text-slate-400 mt-0.5">{[course.code, course.semester].filter(Boolean).join(" · ")}</p>
                 )}
               </div>
             </div>
             <button onClick={() => setShowLectureModal(true)} className="btn-primary flex-shrink-0">
               <Plus className="h-4 w-4" aria-hidden="true" /> Add lecture
             </button>
+          </div>
+          {/* Quick links */}
+          <div className="flex gap-2 mt-3 ml-5">
+            <Link href={`/courses/${course.id}/notes`} className="btn-secondary text-xs py-1.5">
+              <StickyNote className="h-3.5 w-3.5" aria-hidden="true" /> All notes
+            </Link>
           </div>
         </div>
 
@@ -102,26 +119,34 @@ export function CourseDetailClient({ course, initialLectures }: Props) {
                     <span className="text-xs font-mono text-slate-300 w-6 text-right">{idx + 1}</span>
                     <h2 className="font-medium text-slate-900">{lecture.title}</h2>
                   </div>
-                  <button
-                    onClick={() => setUploadTarget(lecture)}
-                    className="btn-ghost text-xs flex-shrink-0"
-                  >
+                  <button onClick={() => setUploadTarget(lecture)} className="btn-ghost text-xs flex-shrink-0">
                     <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Upload PDF
                   </button>
                 </div>
 
                 {lecture.documents.length > 0 && (
-                  <ul className="mt-3 ml-9 space-y-1" aria-label="Documents in this lecture">
+                  <ul className="mt-3 ml-9 space-y-1.5" aria-label="Documents in this lecture">
                     {lecture.documents.map((doc) => (
-                      <li key={doc.id}>
+                      <li key={doc.id} className="group flex items-center gap-2">
                         <Link
                           href={`/courses/${course.id}/lectures/${lecture.id}/documents/${doc.id}`}
-                          className="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 hover:underline"
+                          className="inline-flex items-center gap-2 text-sm text-brand-600 hover:text-brand-700 hover:underline flex-1 min-w-0"
                         >
-                          <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-                          {doc.title}
-                          <span className="text-slate-300 text-xs">{doc.page_count}p</span>
+                          <FileText className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+                          <span className="truncate">{doc.title}</span>
+                          <span className="text-slate-300 text-xs flex-shrink-0">{doc.page_count}p</span>
                         </Link>
+                        <button
+                          onClick={() => deleteDocument(doc, lecture.id)}
+                          disabled={deletingDocId === doc.id}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity btn-ghost p-1 text-red-400 hover:text-red-600 flex-shrink-0"
+                          aria-label={`Delete ${doc.title}`}
+                        >
+                          {deletingDocId === doc.id
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                            : <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          }
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -134,12 +159,7 @@ export function CourseDetailClient({ course, initialLectures }: Props) {
 
       {/* Add lecture modal */}
       {showLectureModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="lecture-modal-title"
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="lecture-modal-title">
           <div className="card w-full max-w-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 id="lecture-modal-title" className="text-lg font-semibold">Add lecture</h2>
@@ -150,19 +170,10 @@ export function CourseDetailClient({ course, initialLectures }: Props) {
             <form onSubmit={createLecture} className="space-y-4">
               <div>
                 <label htmlFor="lecture-title" className="label">Title *</label>
-                <input
-                  id="lecture-title"
-                  required
-                  value={lectureTitle}
-                  onChange={(e) => setLectureTitle(e.target.value)}
-                  className="input"
-                  placeholder="e.g. Lecture 3: Matrix Operations"
-                  autoFocus
-                />
+                <input id="lecture-title" required value={lectureTitle} onChange={(e) => setLectureTitle(e.target.value)}
+                  className="input" placeholder="e.g. Lecture 3: Matrix Operations" autoFocus />
               </div>
-              {error && (
-                <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
-              )}
+              {error && <p role="alert" className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
               <div className="flex gap-2">
                 <button type="button" onClick={() => setShowLectureModal(false)} className="btn-secondary flex-1 justify-center">Cancel</button>
                 <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">
