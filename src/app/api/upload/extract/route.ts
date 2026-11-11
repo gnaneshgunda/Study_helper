@@ -97,10 +97,14 @@ async function extractPdfText(buffer: ArrayBuffer): Promise<string[]> {
   // Dynamic import keeps pdfjs-dist server-side only
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-  // pdfjs needs a fake worker in Node
+  // In Node there is no worker thread — disable it entirely
   pdfjsLib.GlobalWorkerOptions.workerSrc = "";
 
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const pdf = await pdfjsLib.getDocument({
+    data: new Uint8Array(buffer),
+    // @ts-expect-error — legacy build supports this flag; types don't expose it
+    disableWorker: true,
+  }).promise;
   const results: string[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
