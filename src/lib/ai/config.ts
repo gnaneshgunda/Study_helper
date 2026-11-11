@@ -12,12 +12,12 @@ export interface ProviderConfig {
 export const AI_CONFIG: Record<AiTask, ProviderConfig> = {
   chat: {
     provider: "groq",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",          // free tier, 131k context
     fallback: { provider: "gemini", model: "gemini-3.8-flash" },
   },
   format: {
     provider: "groq",
-    model: "llama-3.1-8b-instant",
+    model: "openai/gpt-oss-20b",           // free tier, faster + cheaper
     fallback: { provider: "gemini", model: "gemini-3.8-flash" },
   },
   vision: {
