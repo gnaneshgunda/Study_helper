@@ -71,11 +71,12 @@ export function NotesPanel({
           <div className="h-full flex items-center justify-center">
             <div className="text-center px-4">
               <StickyNote className="h-8 w-8 text-slate-200 mx-auto mb-2" aria-hidden="true" />
-              <p className="text-xs text-slate-400">No notes for this slide yet.</p>
-              <button
-                onClick={() => setEditingId("new")}
-                className="btn-secondary text-xs mt-3 py-1.5"
-              >
+              <p className="text-xs text-slate-400 font-medium mb-1">No notes on slide {currentPage} yet</p>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto mb-3">
+                Write your own, or save an AI answer from the Doubt tab.
+                Notes stay pinned to this slide so you find them later.
+              </p>
+              <button onClick={() => setEditingId("new")} className="btn-secondary text-xs py-1.5">
                 <Plus className="h-3 w-3" aria-hidden="true" /> Add a note
               </button>
             </div>

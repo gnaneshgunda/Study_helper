@@ -43,6 +43,7 @@ export function ChatPanel({
   const [convertingDoubt, setConvertingDoubt] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDoubts, setShowDoubts] = useState(false);
+  const [similarDoubtHint, setSimilarDoubtHint] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -134,6 +135,12 @@ export function ChatPanel({
               .then(({ data }) => { if (data) onDoubtCreated(data); });
           }
 
+          if (parsed.similarDoubts && parsed.similarDoubts.length > 0) {
+            setSimilarDoubtHint(
+              `You asked something similar before: "${parsed.similarDoubts[0].title}" (slide ${parsed.similarDoubts[0].page_number})`
+            );
+          }
+
           if (parsed.chunk) {
             accContent += parsed.chunk;
             setMessages((prev) =>
@@ -158,12 +165,26 @@ export function ChatPanel({
     }
   }
 
-  // Save an AI message as a note pinned to the current page
+  // Save an AI message as a note pinned to the current page (with auto topic)
   async function saveAsNote(messageContent: string, messageId: string) {
     setSavingNote(messageId);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+
+      // Auto-extract topic in background (fire-and-forget, non-blocking)
+      let topic = null;
+      try {
+        const topicRes = await fetch("/api/ai/extract-topic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: messageContent }),
+        });
+        if (topicRes.ok) {
+          const body = await topicRes.json();
+          topic = body.topic;
+        }
+      } catch { /* non-fatal */ }
 
       const { data: note, error: noteErr } = await supabase
         .from("notes")
@@ -175,6 +196,7 @@ export function ChatPanel({
           content_md: messageContent,
           source: "ai",
           tags: [],
+          topic,
         })
         .select()
         .single();
@@ -233,6 +255,7 @@ export function ChatPanel({
     setMessages([]);
     setShowDoubts(false);
     setError(null);
+    setSimilarDoubtHint(null);
     textareaRef.current?.focus();
   }
 
@@ -287,16 +310,46 @@ export function ChatPanel({
         </div>
       )}
 
+      {/* Doubt memory hint */}
+      {similarDoubtHint && messages.length > 0 && (
+        <div className="mx-3 mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700 flex items-start gap-2">
+          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" aria-hidden="true" />
+          <span>{similarDoubtHint}. The tutor will recap this.</span>
+          <button onClick={() => setSimilarDoubtHint(null)} className="ml-auto text-amber-400 hover:text-amber-600" aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
         {messages.length === 0 && (
           <div className="h-full flex items-center justify-center">
-            <div className="text-center">
+            <div className="text-center px-2">
               <FileText className="h-8 w-8 text-slate-200 mx-auto mb-2" aria-hidden="true" />
-              <p className="text-xs text-slate-400">
-                Ask a question about slide {currentPage}
+              <p className="text-sm text-slate-400 font-medium mb-1">
+                Slide {currentPage} is loaded
               </p>
-              <p className="text-xs text-slate-300 mt-1">Shift+Enter for new line</p>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                Ask anything about this slide. The AI can see the text and will remember
+                if you've asked something similar before.
+              </p>
+              <div className="mt-3 flex flex-col gap-1.5 items-center">
+                {[
+                  "What does this slide mean?",
+                  "Explain the formula on this slide",
+                  "Give me an example of this concept",
+                ].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setInput(suggestion)}
+                    className="text-xs text-slate-500 bg-slate-50 hover:bg-brand-50 hover:text-brand-600 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-300 mt-3">Enter to send · Shift+Enter for new line</p>
             </div>
           </div>
         )}
@@ -344,7 +397,7 @@ export function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about this slide…"
+            placeholder={`Ask about slide ${currentPage}…`}
             rows={2}
             className="flex-1 resize-none input text-sm py-2 min-h-[2.5rem] max-h-32"
             aria-label="Message input"

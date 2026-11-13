@@ -72,7 +72,11 @@ export function CoursesClient({ initialCourses }: Props) {
         {courses.length === 0 ? (
           <div className="text-center py-24">
             <GraduationCap className="h-12 w-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-            <p className="text-slate-500">No courses yet. Create your first one.</p>
+            <p className="text-slate-500 font-medium">No courses yet</p>
+            <p className="text-sm text-slate-400 max-w-sm mx-auto mt-1">
+              Create a course, upload your slides, and start asking doubts.
+              The AI sees your slides and builds notes you can revisit anytime.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

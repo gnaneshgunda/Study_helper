@@ -80,6 +80,7 @@ export function ViewerShell({
             documentId={documentId}
             courseId={courseId}
             currentPage={currentPage}
+            pageCount={pageCount}
             lectureTitle={lectureTitle}
             courseName={courseName}
           />

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { aiStream, aiEmbed, ai } from "@/lib/ai/complete";
-import { doubtTutorSystem, revisionSheetPrompt } from "@/lib/ai/prompts";
+import { doubtTutorSystem, revisionSheetPrompt, DOUBT_MEMORY_SYSTEM } from "@/lib/ai/prompts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -110,7 +110,42 @@ export async function POST(request: NextRequest) {
       if (nextText) ragContext += `\n\nNext slide: ${nextText}`;
     }
 
-    // ── 5. Fetch prior messages ──────────────────────────────────────────────
+    // ── 5. Doubt memory: search past doubts for this course ───────────────────
+    let memoryContext = "";
+    let similarDoubts: { id: string; title: string; status: string; page_number: number }[] = [];
+    try {
+      const { data: found } = await svc.rpc("find_similar_doubts", {
+        search_text: userMessage.trim(),
+        course_filter: courseId,
+        match_count: 3,
+      });
+      if (found && found.length > 0) {
+        similarDoubts = (found as { id: string; title: string; status: string; page_number: number }[])
+          .filter((d) => d.id !== resolvedDoubtId);
+
+        if (similarDoubts.length > 0) {
+          // Fetch the answer from the most similar past doubt
+          const { data: pastMsgs } = await svc
+            .from("messages")
+            .select("content, role")
+            .eq("doubt_id", similarDoubts[0].id)
+            .eq("role", "assistant")
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (pastMsgs && pastMsgs.length > 0) {
+            memoryContext = DOUBT_MEMORY_SYSTEM.replace(
+              "Below are previous doubts the student asked in this course, with their answers.",
+              `Previous doubt: "${similarDoubts[0].title}" (slide ${similarDoubts[0].page_number})\nPrevious answer: ${pastMsgs[0].content.slice(0, 500)}...`
+            );
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — doubt memory is a bonus, not a dependency
+    }
+
+    // ── 6. Fetch prior messages ──────────────────────────────────────────────
     const { data: history } = await svc
       .from("messages")
       .select("role, content")
@@ -123,7 +158,7 @@ export async function POST(request: NextRequest) {
       content: m.content,
     }));
 
-    // ── 6. Build prompt ──────────────────────────────────────────────────────
+    // ── 7. Build prompt ──────────────────────────────────────────────────────
     const systemPrompt = doubtTutorSystem({
       course_name: courseName,
       page: pageNumber,
@@ -133,12 +168,14 @@ export async function POST(request: NextRequest) {
       next_slide_text: "",
     });
 
+    // Include doubt memory as an additional system message if found
     const messages = [
       { role: "system" as const, content: systemPrompt },
+      ...(memoryContext ? [{ role: "system" as const, content: memoryContext }] : []),
       ...priorMessages,
     ];
 
-    // ── 7. Stream response ───────────────────────────────────────────────────
+    // ── 8. Stream response ───────────────────────────────────────────────────
     const stream = await aiStream({ task: "chat", messages, noCache: true });
     const encoder = new TextEncoder();
     let fullResponse = "";
@@ -146,9 +183,17 @@ export async function POST(request: NextRequest) {
 
     const readable = new ReadableStream({
       async start(controller) {
+        // First event: send doubtId
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ doubtId: resolvedDoubtId })}\n\n`)
         );
+
+        // If we found similar past doubts, send them so the client can show "you asked this before"
+        if (similarDoubts.length > 0) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ similarDoubts })}\n\n`)
+          );
+        }
         try {
           for await (const chunk of stream) {
             fullResponse += chunk;

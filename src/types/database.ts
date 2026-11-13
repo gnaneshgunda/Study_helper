@@ -109,6 +109,7 @@ export interface Note {
   content_md: string;
   source: "manual" | "ai" | "doubt";
   tags: string[];
+  topic: string | null;
   created_at: string;
   updated_at: string;
 }

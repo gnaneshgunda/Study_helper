@@ -3,25 +3,28 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { type Doubt, type Note } from "@/types/database";
-import { MessageSquare, StickyNote } from "lucide-react";
+import { MessageSquare, StickyNote, Layers } from "lucide-react";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { NotesPanel } from "@/components/notes/NotesPanel";
+import { SectionExplainPanel } from "@/components/chat/SectionExplainPanel";
 
-type Tab = "chat" | "notes";
+type Tab = "chat" | "explain" | "notes";
 
 interface Props {
   documentId: string;
   courseId: string;
   currentPage: number;
+  pageCount: number;
   lectureTitle: string;
   courseName: string;
 }
 
-export function SidePanel({ documentId, courseId, currentPage, lectureTitle, courseName }: Props) {
+export function SidePanel({ documentId, courseId, currentPage, pageCount, lectureTitle, courseName }: Props) {
   const supabase = createClient();
   const [tab, setTab] = useState<Tab>("chat");
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [openNoteId, setOpenNoteId] = useState<string | null>(null);
 
   // Load doubts and notes for the current page whenever the page changes
   useEffect(() => {
@@ -50,16 +53,13 @@ export function SidePanel({ documentId, courseId, currentPage, lectureTitle, cou
     setDoubts((prev) => [doubt, ...prev]);
   }
 
-  const [openNoteId, setOpenNoteId] = useState<string | null>(null);
-
   function handleNoteCreated(note: Note) {
     setNotes((prev) => {
-      // avoid duplicates if the note already came from a direct insert
       if (prev.some((n) => n.id === note.id)) return prev;
       return [note, ...prev];
     });
     setOpenNoteId(note.id);
-    setTab("notes"); // switch to notes tab after save
+    setTab("notes");
   }
 
   function handleNoteUpdated(updated: Note) {
@@ -72,27 +72,22 @@ export function SidePanel({ documentId, courseId, currentPage, lectureTitle, cou
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab bar */}
+      {/* Tab bar — three tabs */}
       <div className="flex border-b border-slate-200 flex-shrink-0">
-        <TabButton
-          active={tab === "chat"}
-          onClick={() => setTab("chat")}
+        <TabButton active={tab === "chat"} onClick={() => setTab("chat")}
           icon={<MessageSquare className="h-4 w-4" aria-hidden="true" />}
-          label="Chat"
-          badge={doubts.filter((d) => d.status === "open").length}
-        />
-        <TabButton
-          active={tab === "notes"}
-          onClick={() => setTab("notes")}
+          label="Doubt" badge={doubts.filter((d) => d.status === "open").length} />
+        <TabButton active={tab === "explain"} onClick={() => setTab("explain")}
+          icon={<Layers className="h-4 w-4" aria-hidden="true" />}
+          label="Explain" badge={0} />
+        <TabButton active={tab === "notes"} onClick={() => setTab("notes")}
           icon={<StickyNote className="h-4 w-4" aria-hidden="true" />}
-          label="Notes"
-          badge={notes.length}
-        />
+          label="Notes" badge={notes.length} />
       </div>
 
       {/* Panel body */}
       <div className="flex-1 min-h-0">
-        {tab === "chat" ? (
+        {tab === "chat" && (
           <ChatPanel
             documentId={documentId}
             courseId={courseId}
@@ -103,7 +98,19 @@ export function SidePanel({ documentId, courseId, currentPage, lectureTitle, cou
             onDoubtCreated={handleDoubtCreated}
             onSaveNote={handleNoteCreated}
           />
-        ) : (
+        )}
+        {tab === "explain" && (
+          <SectionExplainPanel
+            documentId={documentId}
+            courseId={courseId}
+            currentPage={currentPage}
+            pageCount={pageCount}
+            lectureTitle={lectureTitle}
+            courseName={courseName}
+            onSaveNote={handleNoteCreated}
+          />
+        )}
+        {tab === "notes" && (
           <NotesPanel
             documentId={documentId}
             courseId={courseId}
@@ -121,11 +128,7 @@ export function SidePanel({ documentId, courseId, currentPage, lectureTitle, cou
 }
 
 function TabButton({
-  active,
-  onClick,
-  icon,
-  label,
-  badge,
+  active, onClick, icon, label, badge,
 }: {
   active: boolean;
   onClick: () => void;
@@ -136,7 +139,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors flex-1 justify-center ${
+      className={`flex items-center gap-1 px-2 py-3 text-xs font-medium border-b-2 transition-colors flex-1 justify-center ${
         active
           ? "border-brand-500 text-brand-600"
           : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200"
@@ -145,7 +148,7 @@ function TabButton({
       role="tab"
     >
       {icon}
-      {label}
+      <span className="hidden sm:inline">{label}</span>
       {badge > 0 && (
         <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 min-w-[1.25rem]">
           {badge}
