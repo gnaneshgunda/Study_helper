@@ -17,27 +17,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Top nav */}
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-sm">
-        <div className="mx-auto max-w-screen-xl px-4 h-14 flex items-center justify-between">
-          <Link href="/courses" className="flex items-center gap-2 font-bold text-slate-900 hover:text-brand-600 transition-colors">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-500">
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "var(--color-bg)" }}>
+      <header className="sticky top-0 z-40 border-b border-stone-200/70 bg-white/80 backdrop-blur-md">
+        <div className="mx-auto max-w-screen-xl px-5 h-14 flex items-center justify-between">
+          <Link href="/courses" className="flex items-center gap-2 font-bold text-stone-800 hover:text-brand-600 transition-colors">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-500 shadow-sm">
               <BookOpen className="h-4 w-4 text-white" aria-hidden="true" />
             </div>
             StudyDeck
           </Link>
 
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-1.5">
             <Link
               href="/courses"
-              className={`btn-ghost text-sm ${pathname === "/courses" ? "bg-slate-100 text-slate-900" : ""}`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${pathname === "/courses" ? "bg-stone-100 text-stone-900" : "text-stone-500 hover:text-stone-800 hover:bg-stone-50"}`}
             >
               Courses
             </Link>
             <button
               onClick={signOut}
-              className="btn-ghost text-sm text-slate-500"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-all"
               aria-label="Sign out"
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />

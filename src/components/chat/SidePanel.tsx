@@ -72,8 +72,8 @@ export function SidePanel({ documentId, courseId, currentPage, pageCount, lectur
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab bar — three tabs */}
-      <div className="flex border-b border-slate-200 flex-shrink-0">
+      {/* Tab bar — three warm pill tabs */}
+      <div className="flex gap-1 p-2 bg-stone-50 border-b border-stone-200/70 flex-shrink-0">
         <TabButton active={tab === "chat"} onClick={() => setTab("chat")}
           icon={<MessageSquare className="h-4 w-4" aria-hidden="true" />}
           label="Doubt" badge={doubts.filter((d) => d.status === "open").length} />
@@ -139,18 +139,18 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 px-2 py-3 text-xs font-medium border-b-2 transition-colors flex-1 justify-center ${
+      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
         active
-          ? "border-brand-500 text-brand-600"
-          : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200"
+          ? "bg-white text-brand-600 shadow-sm"
+          : "text-stone-500 hover:text-stone-700 hover:bg-white/50"
       }`}
       aria-selected={active}
       role="tab"
     >
       {icon}
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
       {badge > 0 && (
-        <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 min-w-[1.25rem]">
+        <span className="inline-flex items-center justify-center rounded-full bg-brand-100 px-1.5 py-0.5 text-xs text-brand-600 min-w-[1.25rem] font-semibold">
           {badge}
         </span>
       )}

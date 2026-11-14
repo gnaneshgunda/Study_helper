@@ -7,43 +7,50 @@
 
 @layer base {
   :root {
-    --color-bg: #f8fafc;
+    --color-bg: #f7f7f5;
     --color-surface: #ffffff;
-    --color-border: #e2e8f0;
+    --color-border: #ebe9e5;
   }
 
   html {
     @apply antialiased;
+    -webkit-font-smoothing: antialiased;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900;
+    @apply text-slate-900;
+    background-color: var(--color-bg);
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 active:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 active:bg-brand-700 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100 transition-colors disabled:opacity-50;
+    @apply inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-50 active:bg-stone-100 transition-all duration-150 disabled:opacity-50;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors;
+    @apply inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800 transition-all duration-150;
   }
 
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-2xl border border-stone-200/80 bg-white shadow-sm;
   }
 
   .input {
-    @apply w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    @apply w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 transition-all;
   }
 
   .label {
-    @apply block text-sm font-medium text-slate-700 mb-1;
+    @apply block text-sm font-medium text-stone-700 mb-1.5;
+  }
+
+  /* Pill badge for slide numbers */
+  .slide-badge {
+    @apply inline-flex items-center justify-center rounded-full px-3 py-1 text-sm font-bold tabular-nums;
   }
 }
 
@@ -52,17 +59,33 @@
   @apply max-w-full !important;
 }
 
-/* Scrollbar */
+/* Scrollbar — softer */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 rounded-full;
+  @apply bg-stone-300 rounded-full;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-300;
+  @apply bg-stone-400;
+}
+
+/* Smooth fade-in for messages and panels */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.2s ease-out;
 }

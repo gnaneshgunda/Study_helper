@@ -322,34 +322,35 @@ export function ChatPanel({
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+      <div className="flex-1 overflow-y-auto p-3 space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="h-full flex items-center justify-center">
-            <div className="text-center px-2">
-              <FileText className="h-8 w-8 text-slate-200 mx-auto mb-2" aria-hidden="true" />
-              <p className="text-sm text-slate-400 font-medium mb-1">
-                Slide {currentPage} is loaded
+            <div className="text-center px-2 max-w-[260px]">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 mx-auto mb-3">
+                <FileText className="h-6 w-6 text-brand-400" aria-hidden="true" />
+              </div>
+              <p className="text-sm font-medium text-stone-700 mb-1">
+                Slide {currentPage} is ready
               </p>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                Ask anything about this slide. The AI can see the text and will remember
+              <p className="text-xs text-stone-400 leading-relaxed mb-4">
+                Ask anything — the AI sees this slide and remembers
                 if you've asked something similar before.
               </p>
-              <div className="mt-3 flex flex-col gap-1.5 items-center">
+              <div className="space-y-2">
                 {[
                   "What does this slide mean?",
                   "Explain the formula on this slide",
-                  "Give me an example of this concept",
+                  "Give me an example",
                 ].map((suggestion) => (
                   <button
                     key={suggestion}
                     onClick={() => setInput(suggestion)}
-                    className="text-xs text-slate-500 bg-slate-50 hover:bg-brand-50 hover:text-brand-600 rounded-lg px-3 py-1.5 transition-colors"
+                    className="w-full text-xs text-stone-500 bg-stone-50 hover:bg-brand-50 hover:text-brand-600 rounded-xl px-3 py-2.5 transition-all text-left"
                   >
                     {suggestion}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-300 mt-3">Enter to send · Shift+Enter for new line</p>
             </div>
           </div>
         )}
@@ -390,23 +391,23 @@ export function ChatPanel({
       )}
 
       {/* Input */}
-      <form onSubmit={sendMessage} className="border-t border-slate-200 p-3 flex-shrink-0">
-        <div className="flex gap-2 items-end">
+      <form onSubmit={sendMessage} className="border-t border-stone-200/70 p-3 flex-shrink-0 bg-stone-50/50">
+        <div className="flex gap-2 items-end bg-white rounded-2xl border border-stone-200 p-1.5 focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-100 transition-all">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={`Ask about slide ${currentPage}…`}
-            rows={2}
-            className="flex-1 resize-none input text-sm py-2 min-h-[2.5rem] max-h-32"
+            rows={1}
+            className="flex-1 resize-none bg-transparent text-sm py-2 px-2 text-slate-900 placeholder-stone-400 focus:outline-none min-h-[2.5rem] max-h-32"
             aria-label="Message input"
             disabled={sending}
           />
           <button
             type="submit"
             disabled={!input.trim() || sending}
-            className="btn-primary py-2 px-3 flex-shrink-0"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
             aria-label="Send message"
           >
             {sending
@@ -432,32 +433,32 @@ function MessageBubble({
   const isUser = message.role === "user";
 
   return (
-    <div className={`group flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+    <div className={`group flex flex-col gap-1 fade-in-up ${isUser ? "items-end" : "items-start"}`}>
       <div
-        className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
+        className={`max-w-[88%] px-3.5 py-2.5 text-sm ${
           isUser
-            ? "bg-brand-500 text-white rounded-br-sm"
-            : "bg-slate-100 text-slate-800 rounded-bl-sm"
+            ? "bg-brand-500 text-white rounded-2xl rounded-br-md"
+            : "bg-stone-50 text-slate-800 rounded-2xl rounded-bl-md border border-stone-100"
         }`}
       >
         {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
         ) : (
-          <div>
+          <div className="leading-relaxed">
             <MarkdownRenderer content={message.content} />
             {message.streaming && (
-              <span className="inline-block w-1 h-3 bg-slate-400 animate-pulse rounded-sm ml-0.5" aria-label="Streaming" />
+              <span className="inline-block w-1.5 h-3.5 bg-brand-400 animate-pulse rounded-sm ml-0.5" aria-label="Streaming" />
             )}
           </div>
         )}
       </div>
 
-      {/* Save to note button (only for completed assistant messages) */}
+      {/* Save to note — always visible for AI messages, subtle */}
       {!isUser && !message.streaming && message.content && (
         <button
           onClick={() => onSaveNote(message.content, message.id)}
           disabled={isSaving}
-          className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-slate-400 hover:text-brand-600 px-1"
+          className="flex items-center gap-1 text-xs text-stone-400 hover:text-brand-500 px-2 py-0.5 transition-colors"
           aria-label="Save as note"
         >
           {isSaving
