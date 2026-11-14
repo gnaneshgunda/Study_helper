@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { type Doubt, type Note } from "@/types/database";
 import { MessageSquare, StickyNote, Layers } from "lucide-react";
@@ -25,29 +25,31 @@ export function SidePanel({ documentId, courseId, currentPage, pageCount, lectur
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [openNoteId, setOpenNoteId] = useState<string | null>(null);
+  const notesLoadedFor = useRef<string | null>(null);
 
-  // Load doubts and notes for the current page whenever the page changes
+  // Load doubts for the current page (page-specific)
   useEffect(() => {
-    async function loadPageData() {
-      const [doubtsRes, notesRes] = await Promise.all([
-        supabase
-          .from("doubts")
-          .select("*")
-          .eq("document_id", documentId)
-          .eq("page_number", currentPage)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("notes")
-          .select("*")
-          .eq("document_id", documentId)
-          .eq("page_number", currentPage)
-          .order("created_at", { ascending: false }),
-      ]);
-      setDoubts(doubtsRes.data ?? []);
-      setNotes(notesRes.data ?? []);
-    }
-    loadPageData();
+    supabase
+      .from("doubts")
+      .select("*")
+      .eq("document_id", documentId)
+      .eq("page_number", currentPage)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setDoubts(data ?? []));
   }, [documentId, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load ALL notes for the document (not page-specific)
+  useEffect(() => {
+    if (notesLoadedFor.current === documentId) return; // already loaded
+    notesLoadedFor.current = documentId;
+    supabase
+      .from("notes")
+      .select("*")
+      .eq("document_id", documentId)
+      .not("tags", "cs", '["revision"]')
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setNotes(data ?? []));
+  }, [documentId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDoubtCreated(doubt: Doubt) {
     setDoubts((prev) => [doubt, ...prev]);
@@ -72,7 +74,7 @@ export function SidePanel({ documentId, courseId, currentPage, pageCount, lectur
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tab bar — three warm pill tabs */}
+      {/* Tab bar */}
       <div className="flex gap-1 p-2 bg-stone-50 border-b border-stone-200/70 flex-shrink-0">
         <TabButton active={tab === "chat"} onClick={() => setTab("chat")}
           icon={<MessageSquare className="h-4 w-4" aria-hidden="true" />}
@@ -115,6 +117,7 @@ export function SidePanel({ documentId, courseId, currentPage, pageCount, lectur
             documentId={documentId}
             courseId={courseId}
             currentPage={currentPage}
+            pageCount={pageCount}
             notes={notes}
             openNoteId={openNoteId}
             onNoteCreated={handleNoteCreated}

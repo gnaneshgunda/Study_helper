@@ -244,19 +244,16 @@ export function CourseNotesClient({ course, initialNotes, initialRevisionNote }:
                               note={note}
                               onEdit={() => setEditingNoteId(note.id)}
                               onDelete={() => deleteNote(note.id)}
+                              showSlideBadge={true}
                             />
-                            <div className="flex items-center gap-1.5 px-4 pb-2 text-xs text-stone-400">
-                              <span>Slide {note.page_number}</span>
-                              {note.documents && (
-                                <>
-                                  <span>·</span>
-                                  <Link href={`/courses/${course.id}/lectures/${note.documents.lectures?.id}/documents/${note.documents.id}`}
-                                    className="hover:text-brand-600 hover:underline truncate max-w-[180px]">
-                                    {note.documents.title}
-                                  </Link>
-                                </>
-                              )}
-                            </div>
+                            {note.documents && (
+                              <div className="px-4 pb-2 ml-10.5 text-xs text-stone-400">
+                                <Link href={`/courses/${course.id}/lectures/${note.documents.lectures?.id}/documents/${note.documents.id}`}
+                                  className="hover:text-brand-600 hover:underline truncate max-w-[180px] inline-block">
+                                  {note.documents.title}
+                                </Link>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

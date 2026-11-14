@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { type Note } from "@/types/database";
-import { Pencil, Trash2, Bot, User, MessageSquare, ChevronDown, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Bot, User, MessageSquare, ChevronDown, Loader2, FileText } from "lucide-react";
 import { MarkdownRenderer } from "@/components/ui/MarkdownRenderer";
 import { createClient } from "@/lib/supabase/client";
 
@@ -19,22 +19,16 @@ const SOURCE_LABEL: Record<Note["source"], string> = {
 
 /** Extract a readable title from note content */
 function extractTitle(content: string): string {
-  // Try ## Heading
   const headingMatch = content.match(/^##\s+(.+)$/m);
   if (headingMatch) return headingMatch[1].trim().slice(0, 80);
-
-  // Try **Concept:** line
   const conceptMatch = content.match(/\*\*Concept:\*\*\s*(.+)/);
   if (conceptMatch) return conceptMatch[1].trim().slice(0, 80);
-
-  // Try first non-empty line, strip markdown
   const firstLine = content.trim().split("\n")[0]?.replace(/[#*_`>]/g, "").trim();
   if (firstLine) return firstLine.slice(0, 80);
-
   return "Untitled note";
 }
 
-/** Extract a short preview (first ~100 chars without markdown) */
+/** Extract a short preview */
 function extractPreview(content: string): string {
   const cleaned = content
     .replace(/^##.*$/gm, "")
@@ -42,18 +36,19 @@ function extractPreview(content: string): string {
     .replace(/\$[^$]+\$/g, "[formula]")
     .replace(/\s+/g, " ")
     .trim();
-  return cleaned.slice(0, 100) + (cleaned.length > 100 ? "…" : "");
+  return cleaned.slice(0, 120) + (cleaned.length > 120 ? "…" : "");
 }
 
 interface Props {
   note: Note;
   onEdit: () => void;
   onDelete: () => void;
-  /** Default expanded state */
   defaultExpanded?: boolean;
+  /** Show "Slide X" badge (when notes span multiple slides) */
+  showSlideBadge?: boolean;
 }
 
-export function NoteCard({ note, onEdit, onDelete, defaultExpanded = false }: Props) {
+export function NoteCard({ note, onEdit, onDelete, defaultExpanded = false, showSlideBadge = false }: Props) {
   const supabase = createClient();
   const [deleting, setDeleting] = useState(false);
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -83,57 +78,63 @@ export function NoteCard({ note, onEdit, onDelete, defaultExpanded = false }: Pr
       aria-expanded={expanded}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpanded(!expanded); } }}
     >
-      {/* Title row */}
-      <div className="flex items-start gap-2">
-        {/* Source icon */}
-        <div className="flex items-center gap-1.5 mt-0.5 flex-shrink-0">
-          {SOURCE_ICON[note.source]}
+      {/* File-like row: icon + title */}
+      <div className="flex items-start gap-2.5">
+        {/* File icon */}
+        <div className="mt-0.5 flex-shrink-0">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${expanded ? "bg-brand-50" : "bg-stone-100"}`}>
+            <FileText className={`h-4 w-4 transition-colors ${expanded ? "text-brand-500" : "text-stone-400"}`} aria-hidden="true" />
+          </div>
         </div>
 
-        {/* Title + preview */}
+        {/* Title + meta */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-stone-800 leading-snug">
             {title}
           </p>
+
+          {/* Meta row: source + slide badge + tags */}
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {SOURCE_ICON[note.source]}
+            <span className="text-[10px] text-stone-400">{SOURCE_LABEL[note.source]}</span>
+
+            {showSlideBadge && (
+              <span className="flex items-center gap-0.5 rounded-full bg-brand-50 px-1.5 py-0.5 text-[10px] text-brand-600 font-medium">
+                Slide {note.page_number}
+              </span>
+            )}
+
+            {note.topic && (
+              <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-500 font-medium">
+                {note.topic}
+              </span>
+            )}
+
+            {note.tags.map((t) => (
+              <span key={t} className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-400">
+                {t}
+              </span>
+            ))}
+          </div>
+
+          {/* Preview when collapsed */}
           {!expanded && (
-            <p className="text-xs text-stone-400 mt-0.5 leading-relaxed truncate">
-              {preview || note.content_md.slice(0, 80) + "…"}
+            <p className="text-xs text-stone-400 mt-1 leading-relaxed line-clamp-2">
+              {preview || note.content_md.slice(0, 100) + "…"}
             </p>
           )}
         </div>
 
         {/* Chevron */}
         <ChevronDown
-          className={`h-4 w-4 text-stone-300 flex-shrink-0 mt-1 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          className={`h-4 w-4 text-stone-300 flex-shrink-0 mt-2 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
           aria-hidden="true"
         />
       </div>
 
-      {/* Tags row — always visible */}
-      {note.tags.length > 0 && (
-        <div className="flex items-center gap-1.5 mt-1.5 ml-6">
-          {note.tags.map((t) => (
-            <span key={t} className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-500 font-medium">
-              {t}
-            </span>
-          ))}
-          {note.topic && (
-            <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] text-brand-600 font-medium">
-              {note.topic}
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Expanded content */}
       {expanded && (
-        <div className="mt-3 ml-6 fade-in-up">
-          {/* Source label */}
-          <div className="text-[10px] text-stone-300 mb-2 flex items-center gap-1">
-            {SOURCE_LABEL[note.source]}
-          </div>
-
-          {/* Full content */}
+        <div className="mt-3 ml-10.5 fade-in-up">
           <MarkdownRenderer content={note.content_md} />
 
           {/* Actions */}
