@@ -11,7 +11,6 @@ interface Props {
   courseId: string;
   currentPage: number;
   notes: Note[];
-  /** If set, open this note in edit mode immediately (e.g. after save-from-chat) */
   openNoteId?: string | null;
   onNoteCreated: (note: Note) => void;
   onNoteUpdated: (note: Note) => void;
@@ -19,41 +18,35 @@ interface Props {
 }
 
 export function NotesPanel({
-  documentId,
-  courseId,
-  currentPage,
-  notes,
-  openNoteId = null,
-  onNoteCreated,
-  onNoteUpdated,
-  onNoteDeleted,
+  documentId, courseId, currentPage, notes,
+  openNoteId = null, onNoteCreated, onNoteUpdated, onNoteDeleted,
 }: Props) {
   const [editingId, setEditingId] = useState<string | "new" | null>(openNoteId);
 
   function handleCreated(note: Note) {
     onNoteCreated(note);
-    setEditingId(note.id); // open the new note in editor right away
+    setEditingId(note.id);
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 flex-shrink-0">
-        <span className="text-xs text-slate-500 font-medium">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-stone-200/70 flex-shrink-0 bg-stone-50/50">
+        <span className="text-xs text-stone-500 font-medium">
           Slide {currentPage} · {notes.length} note{notes.length !== 1 ? "s" : ""}
         </span>
         <button
           onClick={() => setEditingId("new")}
-          className="btn-ghost text-xs py-1 px-2"
+          className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800 transition-all"
           aria-label="Create new note"
         >
-          <Plus className="h-3 w-3" aria-hidden="true" /> New note
+          <Plus className="h-3 w-3" aria-hidden="true" /> New
         </button>
       </div>
 
       {/* New note editor */}
       {editingId === "new" && (
-        <div className="border-b border-slate-100 flex-shrink-0">
+        <div className="border-b border-stone-200/70 flex-shrink-0">
           <NoteEditor
             documentId={documentId}
             courseId={courseId}
@@ -65,26 +58,28 @@ export function NotesPanel({
         </div>
       )}
 
-      {/* Notes list */}
+      {/* Notes list — accordion cards */}
       <div className="flex-1 overflow-y-auto min-h-0">
         {notes.length === 0 && editingId !== "new" ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center px-4">
-              <StickyNote className="h-8 w-8 text-slate-200 mx-auto mb-2" aria-hidden="true" />
-              <p className="text-xs text-slate-400 font-medium mb-1">No notes on slide {currentPage} yet</p>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto mb-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-100 mx-auto mb-3">
+                <StickyNote className="h-6 w-6 text-stone-300" aria-hidden="true" />
+              </div>
+              <p className="text-sm text-stone-500 font-medium mb-1">No notes on slide {currentPage} yet</p>
+              <p className="text-xs text-stone-400 max-w-xs mx-auto mb-4">
                 Write your own, or save an AI answer from the Doubt tab.
-                Notes stay pinned to this slide so you find them later.
+                Notes stay pinned to this slide.
               </p>
-              <button onClick={() => setEditingId("new")} className="btn-secondary text-xs py-1.5">
+              <button onClick={() => setEditingId("new")} className="btn-secondary text-xs py-2">
                 <Plus className="h-3 w-3" aria-hidden="true" /> Add a note
               </button>
             </div>
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100" aria-label="Notes for this slide">
+          <div className="divide-y divide-stone-100" aria-label="Notes for this slide">
             {notes.map((note) => (
-              <li key={note.id}>
+              <div key={note.id}>
                 {editingId === note.id ? (
                   <NoteEditor
                     note={note}
@@ -103,11 +98,12 @@ export function NotesPanel({
                     note={note}
                     onEdit={() => setEditingId(note.id)}
                     onDelete={() => onNoteDeleted(note.id)}
+                    defaultExpanded={openNoteId === note.id}
                   />
                 )}
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </div>
