@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, FileText, PanelRight, PanelRightClose, ArrowLeftRight } from "lucide-react";
+import { ChevronLeft, FileText, PanelRight, PanelRightClose } from "lucide-react";
 import { SlideViewer } from "@/components/pdf/SlideViewer";
 import { SidePanel } from "@/components/chat/SidePanel";
+
+const MIN_WIDTH = 300;
+const MAX_WIDTH = 900;
 
 interface Props {
   documentId: string;
@@ -24,9 +27,51 @@ export function ViewerShell({
 }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const [panelOpen, setPanelOpen] = useState(true);
-  const [panelWide, setPanelWide] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(400);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Refs for drag tracking (avoid re-renders during drag)
+  const draggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
 
   const handlePageChange = useCallback((page: number) => setCurrentPage(page), []);
+
+  // ── Drag resize logic ──────────────────────────────────────────────────
+  function handleMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    draggingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = panelWidth;
+    setIsDragging(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  useEffect(() => {
+    function handleMouseMove(e: MouseEvent) {
+      if (!draggingRef.current) return;
+      // Moving cursor left = wider panel, right = narrower
+      const delta = startXRef.current - e.clientX;
+      const newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidthRef.current + delta));
+      setPanelWidth(newWidth);
+    }
+
+    function handleMouseUp() {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      setIsDragging(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: "#f0eeea" }}>
@@ -52,18 +97,6 @@ export function ViewerShell({
           <span className="text-xs text-stone-400 ml-0.5">slides</span>
         </div>
 
-        {/* Toggle panel width (only when open) */}
-        {panelOpen && (
-          <button
-            onClick={() => setPanelWide(!panelWide)}
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-stone-100 text-stone-400 transition-all flex-shrink-0"
-            aria-label={panelWide ? "Normal width" : "Widen panel"}
-            title={panelWide ? "Normal width" : "Wider panel"}
-          >
-            <ArrowLeftRight className="h-4 w-4" />
-          </button>
-        )}
-
         {/* Toggle panel visibility */}
         <button
           onClick={() => setPanelOpen(!panelOpen)}
@@ -87,22 +120,49 @@ export function ViewerShell({
           />
         </div>
 
-        {/* Right: side panel */}
+        {/* Right: side panel with drag handle */}
         {panelOpen && (
-          <div
-            className={`flex-shrink-0 border-l border-stone-200/70 bg-white flex flex-col min-h-0 transition-[width] duration-200 ease-out ${
-              panelWide ? "w-[580px]" : "w-[400px]"
-            }`}
-          >
-            <SidePanel
-              documentId={documentId}
-              courseId={courseId}
-              currentPage={currentPage}
-              pageCount={pageCount}
-              lectureTitle={lectureTitle}
-              courseName={courseName}
-            />
-          </div>
+          <>
+            {/* Drag handle — thin bar on the left edge */}
+            <div
+              onMouseDown={handleMouseDown}
+              className={`group/drag flex-shrink-0 w-1 bg-stone-200/60 hover:bg-brand-400 cursor-col-resize relative transition-colors ${
+                isDragging ? "bg-brand-400" : ""
+              }`}
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Drag to resize panel"
+            >
+              {/* Visible grip dots on hover */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-0.5">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className={`w-1 h-1 rounded-full transition-all ${
+                      isDragging
+                        ? "bg-brand-600"
+                        : "bg-stone-300 group-hover/drag:bg-brand-400"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Panel itself */}
+            <div
+              className="flex-shrink-0 bg-white flex flex-col min-h-0 overflow-hidden"
+              style={{ width: `${panelWidth}px` }}
+            >
+              <SidePanel
+                documentId={documentId}
+                courseId={courseId}
+                currentPage={currentPage}
+                pageCount={pageCount}
+                lectureTitle={lectureTitle}
+                courseName={courseName}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>
