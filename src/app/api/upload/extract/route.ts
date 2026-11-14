@@ -3,7 +3,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { aiEmbed } from "@/lib/ai/complete";
 
 export const runtime = "nodejs";
-export const maxDuration = 120; // embeddings take time for large PDFs
+export const maxDuration = 55; // Vercel free plan max is 60s
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,12 +83,6 @@ export async function POST(request: NextRequest) {
       if (pageErr) {
         console.error("Page insert error:", pageErr.message);
       }
-
-      // Generate embeddings in background (non-blocking — return doc immediately)
-      // We fire-and-forget so the upload UX is fast
-      if (insertedPages && process.env.GEMINI_API_KEY) {
-        void embedPagesInBackground(insertedPages, svc);
-      }
     }
 
     return NextResponse.json(doc);
@@ -98,30 +92,6 @@ export async function POST(request: NextRequest) {
       { error: err instanceof Error ? err.message : "Internal error" },
       { status: 500 }
     );
-  }
-}
-
-/**
- * Embed pages in the background after upload returns.
- * Processes pages sequentially to stay within Gemini rate limits.
- */
-async function embedPagesInBackground(
-  pages: { id: string; page_number: number; text: string }[],
-  svc: Awaited<ReturnType<typeof createServiceClient>>
-) {
-  for (const page of pages) {
-    try {
-      if (!page.text.trim()) continue; // skip image-only pages
-      const embedding = await aiEmbed(page.text);
-      await svc
-        .from("pages")
-        .update({ embedding: embedding as unknown as number[] })
-        .eq("id", page.id);
-      // Small delay to stay within Gemini free-tier rate limit (15 RPM)
-      await new Promise((r) => setTimeout(r, 300));
-    } catch (err) {
-      console.warn(`Embedding failed for page ${page.page_number}:`, err);
-    }
   }
 }
 

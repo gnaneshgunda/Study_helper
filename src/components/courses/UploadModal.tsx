@@ -69,6 +69,13 @@ export function UploadModal({ courseId, lecture, onClose, onComplete }: Props) {
       setProgress(100);
       setStage("done");
 
+      // 4. Trigger embeddings in the background (client-side call so it survives on Vercel)
+      fetch("/api/upload/embed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentId: doc.id }),
+      }).catch(() => {}); // non-fatal — RAG falls back to neighbour pages
+
       setTimeout(() => {
         onComplete({ id: doc.id, title: doc.title, page_count: doc.page_count });
       }, 600);
