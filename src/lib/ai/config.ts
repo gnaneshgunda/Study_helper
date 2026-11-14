@@ -26,6 +26,6 @@ export const AI_CONFIG: Record<AiTask, ProviderConfig> = {
   },
   embed: {
     provider: "gemini",
-    model: "text-embedding-004",
+    model: "gemini-embedding-001",
   },
 };
